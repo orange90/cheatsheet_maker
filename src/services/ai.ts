@@ -57,7 +57,7 @@ class AIService {
     const messages = [
       {
         role: 'system',
-        content: `Translate the cheatsheet from ${sourceLanguage} to ${targetLanguage} while strictly preserving the structure and format: \nCheatsheet Title: <...>\nSection: <...>\n- <point title>: <point detail>\nDo not add emojis or decorative symbols. Keep at most 12 points in total.`
+        content: `Translate the cheatsheet from ${sourceLanguage} to ${targetLanguage} while strictly preserving the structure and format: \nCheatsheet Title: <...>\nSection: <...>\n- <point title>: <point detail>\nDo not add emojis or decorative symbols. Keep at most 12 points in total. Do NOT translate technical terms and proper nouns such as: Transformer, Token, Prompt, LLM, GPU, CPU, Attention, Dataset, API, JSON, HTTP, JavaScript, TypeScript, React, Vite. Preserve code identifiers and names.`
       },
       {
         role: 'user',

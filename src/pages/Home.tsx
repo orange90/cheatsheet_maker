@@ -11,7 +11,9 @@ import { Toaster } from 'sonner'
 export default function Home() {
   const { 
     cheatsheetData, 
-    setInputContent
+    setInputContent,
+    isLoading,
+    loadingMessage
   } = useStore()
   const exportRef = useRef<HTMLDivElement>(null)
 
@@ -76,7 +78,7 @@ export default function Home() {
 
           {/* Middle Column - Preview */}
           <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 relative">
               <div
                 ref={exportRef}
                 className="mx-auto overflow-auto"
@@ -90,6 +92,14 @@ export default function Home() {
                   title={cheatsheetData?.title || 'Cheatsheet'}
                 />
               </div>
+              {isLoading && (
+                <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                    <span className="text-blue-700 font-medium text-sm">{loadingMessage || 'Processing...'}</span>
+                  </div>
+                </div>
+              )}
             </div>
             
             {cheatsheetData && (

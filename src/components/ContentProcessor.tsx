@@ -28,7 +28,7 @@ export function ContentProcessor({ onProcessingComplete }: ContentProcessorProps
     }
 
     setIsProcessing(true)
-    setLoading(true, 'Processing content with AI...')
+    setLoading(true, 'Summarizing...')
     setError(null)
 
     try {
@@ -52,16 +52,36 @@ export function ContentProcessor({ onProcessingComplete }: ContentProcessorProps
         }))
       }
       const limited = items.slice(0, 12)
-      
-      // Create cheatsheet data
-      const cheatsheetData = {
-        title,
-        language: selectedLanguage,
-        items: limited
+
+      const grouped = new Map<string, CheatsheetItem[]>()
+      limited.forEach(i => {
+        const key = i.category || 'General'
+        if (!grouped.has(key)) grouped.set(key, [])
+        grouped.get(key)!.push(i)
+      })
+      const lines: string[] = []
+      lines.push(`Cheatsheet Title: ${title}`)
+      for (const [cat, arr] of grouped.entries()) {
+        lines.push(`Section: ${cat}`)
+        arr.forEach(i => lines.push(`- ${i.title}: ${i.content}`))
       }
 
-      setCheatsheetData(cheatsheetData)
-      onProcessingComplete(aiResponse.data)
+      setLoading(true, 'Translating...')
+      const translated = await aiService.translateContent(lines.join('\n'), selectedLanguage)
+      if (!translated.success || !translated.data) {
+        const cheatsheetData = {
+          title,
+          language: selectedLanguage,
+          items: limited
+        }
+        setCheatsheetData(cheatsheetData)
+        onProcessingComplete(aiResponse.data)
+      } else {
+        const newTitle = extractTitle(translated.data, title)
+        const finalItems = parseAIResponseToItems(translated.data).slice(0, 12)
+        setCheatsheetData({ title: newTitle, language: selectedLanguage, items: finalItems })
+        onProcessingComplete(translated.data)
+      }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Processing failed')
     } finally {
@@ -210,9 +230,14 @@ export function ContentProcessor({ onProcessingComplete }: ContentProcessorProps
         <h3 className="text-lg font-semibold text-gray-800">Content Processing</h3>
         <div className="flex items-center space-x-2">
           <Globe className="w-5 h-5 text-blue-600" />
-          <span className="text-sm text-gray-600">
-            Language: {selectedLanguage === 'zh' ? '中文' : 'English'}
-          </span>
+          <select
+            value={selectedLanguage}
+            onChange={(e) => setSelectedLanguage(e.target.value as 'zh' | 'en')}
+            className="text-sm border border-gray-300 rounded-lg px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="zh">中文</option>
+            <option value="en">English</option>
+          </select>
         </div>
       </div>
 
@@ -228,15 +253,6 @@ export function ContentProcessor({ onProcessingComplete }: ContentProcessorProps
             <FileText className="w-4 h-4" />
           )}
           <span>{isProcessing ? 'Processing...' : 'Generate Cheatsheet'}</span>
-        </button>
-
-        <button
-          onClick={translateContent}
-          disabled={isProcessing}
-          className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          <Languages className="w-4 h-4" />
-          <span>Translate ({selectedLanguage === 'zh' ? 'EN' : '中文'})</span>
         </button>
       </div>
 
