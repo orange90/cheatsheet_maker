@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Loader2, Globe, FileText, Languages } from 'lucide-react'
+import { Loader2, Globe, FileText } from 'lucide-react'
 import { useStore } from '@/stores'
 import { aiService } from '@/services/ai'
 import { generateId, getRandomColorScheme } from '@/utils'
@@ -90,60 +90,6 @@ export function ContentProcessor({ onProcessingComplete }: ContentProcessorProps
     }
   }
 
-  const translateContent = async () => {
-    if (!inputContent.trim()) {
-      setError('No content to translate')
-      return
-    }
-
-    setIsProcessing(true)
-    setLoading(true, 'Translating content...')
-    setError(null)
-
-    try {
-      const targetLang = selectedLanguage === 'zh' ? 'en' : 'zh'
-      const { cheatsheetData } = useStore.getState()
-      if (cheatsheetData && cheatsheetData.items.length > 0) {
-        const grouped = new Map<string, CheatsheetItem[]>()
-        cheatsheetData.items.forEach(i => {
-          const key = i.category || 'General'
-          if (!grouped.has(key)) grouped.set(key, [])
-          grouped.get(key)!.push(i)
-        })
-        const lines: string[] = []
-        lines.push(`Cheatsheet Title: ${cheatsheetData.title}`)
-        for (const [cat, arr] of grouped.entries()) {
-          lines.push(`Section: ${cat}`)
-          arr.forEach(i => lines.push(`- ${i.title}: ${i.content}`))
-        }
-        const combined = lines.join('\n')
-        const aiResponse = await aiService.translateContent(combined, targetLang)
-        if (!aiResponse.success || !aiResponse.data) {
-          throw new Error(aiResponse.error || 'Translation failed')
-        }
-        const newTitle = extractTitle(aiResponse.data, cheatsheetData.title)
-        const items = parseAIResponseToItems(aiResponse.data).slice(0, 12)
-        useStore.getState().setCheatsheetData({
-          title: newTitle,
-          language: targetLang,
-          items
-        })
-        setSelectedLanguage(targetLang)
-      } else {
-        const aiResponse = await aiService.translateContent(inputContent, targetLang)
-        if (!aiResponse.success || !aiResponse.data) {
-          throw new Error(aiResponse.error || 'Translation failed')
-        }
-        onProcessingComplete(aiResponse.data)
-        setSelectedLanguage(targetLang)
-      }
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Translation failed')
-    } finally {
-      setIsProcessing(false)
-      setLoading(false)
-    }
-  }
 
   const parseAIResponseToItems = (aiResponse: string): CheatsheetItem[] => {
     // Simple parsing - in production, you might want more sophisticated parsing
@@ -232,7 +178,7 @@ export function ContentProcessor({ onProcessingComplete }: ContentProcessorProps
           <Globe className="w-5 h-5 text-blue-600" />
           <select
             value={selectedLanguage}
-            onChange={(e) => setSelectedLanguage(e.target.value as 'zh' | 'en')}
+            onChange={(e) => handleLanguageChange(e.target.value as 'zh' | 'en')}
             className="text-sm border border-gray-300 rounded-lg px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="zh">中文</option>
@@ -270,3 +216,50 @@ export function ContentProcessor({ onProcessingComplete }: ContentProcessorProps
     </div>
   )
 }
+  const handleLanguageChange = async (lang: 'zh' | 'en') => {
+    const { cheatsheetData } = useStore.getState()
+    if (!cheatsheetData || cheatsheetData.items.length === 0) {
+      setSelectedLanguage(lang)
+      return
+    }
+
+    if (lang === selectedLanguage) return
+
+    try {
+      setIsProcessing(true)
+      setLoading(true, 'Translating...')
+      setError(null)
+      const grouped = new Map<string, CheatsheetItem[]>()
+      cheatsheetData.items.forEach(i => {
+        const key = i.category || 'General'
+        if (!grouped.has(key)) grouped.set(key, [])
+        grouped.get(key)!.push(i)
+      })
+      const lines: string[] = []
+      lines.push(`Cheatsheet Title: ${cheatsheetData.title}`)
+      for (const [cat, arr] of grouped.entries()) {
+        lines.push(`Section: ${cat}`)
+        arr.forEach(i => lines.push(`- ${i.title}: ${i.content}`))
+      }
+
+      const resp = await aiService.translateContent(lines.join('\n'), lang)
+      if (!resp.success || !resp.data) {
+        throw new Error(resp.error || 'Translation failed')
+      }
+
+      const newTitle = extractTitle(resp.data, cheatsheetData.title)
+      const items = parseAIResponseToItems(resp.data).slice(0, 12)
+      useStore.getState().setCheatsheetData({
+        title: newTitle,
+        language: lang,
+        items
+      })
+      setSelectedLanguage(lang)
+      onProcessingComplete(resp.data)
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Translation failed')
+    } finally {
+      setIsProcessing(false)
+      setLoading(false)
+    }
+  }
